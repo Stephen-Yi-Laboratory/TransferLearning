@@ -1,8 +1,5 @@
-# ===== LEAVE-ONE-OUT CROSS-VALIDATION (LOOCV) =====
-# This section tests the stability of cell line predictions by iteratively
-# removing one cell and predicting on the remaining cells
-
-cat("\n===== Running Leave-One-Out Cross-Validation =====\n")
+# Leave-one-out Cross Validation
+# Tests the stability of cell line predictions by iteratively removing one cell and predicting on the remaining cells
 
 # Load patient data
 query <- readMM('./data/count_matrix_sparse.mtx')
@@ -14,7 +11,7 @@ queryMetadata <- read.csv('./data/metadata.csv', row.names = 1)
 DC <- pbsapply(unique(queryMetadata$orig.ident), function(Donor){
   rowSums(query[,grepl(Donor, colnames(query))])
 })
-write.csv(DC, './results/allCellsPatientsPseudobulkProfiles_integrated.csv')
+write.csv(DC, './results/allCellsPatientsPseudobulkProfiles.csv')
 
 queryMetadata <- queryMetadata[grepl('Cancer',queryMetadata$celltype_minor),]
 query <- query[,rownames(queryMetadata)]
@@ -22,7 +19,7 @@ query <- query[,rownames(queryMetadata)]
 DCC <- pbsapply(unique(queryMetadata$orig.ident), function(Donor){
   rowSums(query[,grepl(Donor, colnames(query))])
 })
-write.csv(DCC, './results/cancerCellsPatientPseudobulkProfiles_integrated.csv')
+write.csv(DCC, './results/cancerCellsPatientPseudobulkProfiles.csv')
 
 donorSubType <- queryMetadata$subtype
 names(donorSubType) <- queryMetadata$orig.ident
@@ -33,9 +30,8 @@ donorData <- query[,(queryMetadata$orig.ident %in% donor)]
 cNames <- colnames(donorData)
 
 cat(paste("Running LOOCV for donor", donor, "with", length(cNames), "cells\n"))
-cat("This will take some time...\n\n")
 
-# Perform LOOCV - iteratively remove one cell and predict
+# Perform LOOCV
 LOOCV <- pbsapply(colnames(donorData), function(C){
   # Remove one cell at a time
   donorData_loo <- donorData[, !cNames %in% C]
@@ -55,10 +51,10 @@ LOOCV <- pbsapply(colnames(donorData), function(C){
   table(qmap$meta_data$cell_type_pred_knn)
 })
 
-write.csv(LOOCV, './results/ccLOOCV_integrated.csv')
+write.csv(LOOCV, './results/ccLOOCV.csv')
 
 cat("LOOCV analysis complete!\n")
-cat(paste("Results saved to: ./results/ccLOOCV_integrated.csv\n\n"))
+cat(paste("Results saved to: ./results/ccLOOCV.csv\n\n"))
 
 # Calculate LOOCV statistics
 cvMean <- round((apply(LOOCV, 1, mean)/ncol(donorData)) * 100, 2)
@@ -70,16 +66,15 @@ print(sort(cvMean, decreasing = TRUE))
 cat("\nStandard deviations (%):\n")
 print(sort(cvSD, decreasing = TRUE))
 
-# ===== HIERARCHICAL CLUSTERING ANALYSIS =====
-cat("\n===== Performing Hierarchical Clustering =====\n")
+# Hierarchical Clustering Analysis
 
 # Create pseudobulk profiles from integrated reference
-cat("Creating pseudobulk profiles from integrated reference...\n")
+cat("Creating pseudobulk profiles from integrated reference\n")
 CL <- pbsapply(unique(X$cell_line), function(CT) {
   rowSums(GetAssayData(X, assay = "RNA", slot = "counts")[, X$cell_line %in% CT])
 })
 colnames(CL) <- unique(X$cell_line)
-write.csv(CL, './results/cellLinePseudobulkProfiles_integrated.csv')
+write.csv(CL, './results/cellLinePseudobulkProfiles.csv')
 
 cat(paste("Created pseudobulk profiles for", ncol(CL), "cell lines\n"))
 
@@ -93,13 +88,13 @@ COMBN <- log1p((t(t(COMBN)/colSums(COMBN)))*1e4)
 spCor <- function(x){as.dist(cor(x, method = 'sp'))}
 O_all <- pvclust(COMBN, method.dist = spCor, parallel = TRUE, nboot = 1000, method.hclust = 'complete')
 
-png('./figures/S3_integrated.png', width = 4000, height = 1000, res = 300)
+png('./figures/S3.png', width = 4000, height = 1000, res = 300)
 par(mar=c(1,4,1,1))
 plot(O_all, print.pv = 'bp', print.num = FALSE, main = '', sub = '', xlab = '')
 pvrect(O_all, alpha = 0.95)
 dev.off()
 
-cat("Saved: ./figures/S3_integrated.png\n")
+cat("Saved: ./figures/S3.png\n")
 
 # Clustering with cancer cells only
 cat("\nClustering: Cell Lines + Cancer Cells Only\n")
@@ -110,12 +105,10 @@ COMBN <- log1p((t(t(COMBN)/colSums(COMBN)))*1e4)
 
 O_cancer <- pvclust(COMBN, method.dist = spCor, parallel = TRUE, nboot = 1000, method.hclust = 'complete')
 
-png('./figures/S4_integrated.png', width = 4000, height = 1000, res = 300)
+png('./figures/S4.png', width = 4000, height = 1000, res = 300)
 par(mar=c(1,4,1,1))
 plot(O_cancer, print.pv = 'bp', print.num = FALSE, main = '', sub = '', xlab = '')
 pvrect(O_cancer, alpha = 0.95)
 dev.off()
 
-cat("Saved: ./figures/S4_integrated.png\n")
-
-cat("\n===== LOOCV and Clustering Analysis Complete =====\n")
+cat("Saved: ./figures/S4.png\n")

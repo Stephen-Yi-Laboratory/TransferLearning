@@ -1,3 +1,5 @@
+# Drug Prioritization Analysis Using Integrated Reference Atlas
+
 library(ggplot2)
 library(ggrepel)
 library(circlize)
@@ -21,7 +23,7 @@ iData$CELL_LINE_NAME <- toupper(gsub('-','',iData$CELL_LINE_NAME))
 cancerSubtypes <- read.csv('./results/F4.csv', row.names = 1)
 BRCA <- colSums(cancerSubtypes)/sum(cancerSubtypes)
 
-patientComposition <- read.csv('./results/F3C_integrated.csv', row.names = 1)
+patientComposition <- read.csv('./results/F3C.csv', row.names = 1)
 CID44971 <- patientComposition$proportion[patientComposition$donor == 'CID44971']
 names(CID44971) <- patientComposition$cellLine[patientComposition$donor == 'CID44971']
 
@@ -177,7 +179,7 @@ AAAAAA
 AAAAAA
 BBCCDD'
 
-png('./figures/S6_integrated.png', width = 3000, height = 2000, res = 300)
+png('./figures/S6.png', width = 3000, height = 2000, res = 300)
 PD+PA+PB+PC + plot_layout(design = pLayout) + plot_annotation(tag_levels = 'A')
 dev.off()
 
@@ -192,6 +194,6 @@ P7 <- findDrugCombinations(iData, rER, plotTitle = 'ER+', outFile = './results/S
 P8 <- findDrugCombinations(iData, rHER2, plotTitle = 'HER2+', outFile = './results/SF5B.csv')
 P9 <- findDrugCombinations(iData, rTNBC, plotTitle = 'TNBC', outFile = './results/SF5C.csv')
 
-png('./figures/S5_integrated.png', width = 3000, height = 1000, res = 300)
+png('./figures/S5.png', width = 3000, height = 1000, res = 300)
 P7 + P8 + P9
 dev.off()

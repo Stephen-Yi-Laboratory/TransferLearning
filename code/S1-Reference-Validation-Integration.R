@@ -1,5 +1,5 @@
-# Integration with Quantile Normalization - Final Version
-# Scale Kinker dataset to match Original dataset distribution
+# Reference Atlas Integration via Quantile Normalization
+# Transfer Learning Validation on Patient Data
 
 library(Seurat)
 library(ggplot2)
@@ -20,7 +20,7 @@ library(pvclust) # For LOOCV
 source('https://raw.githubusercontent.com/dosorio/utilities/master/data.frame2matrix.R')
 source('https://raw.githubusercontent.com/dosorio/utilities/master/ggColors.R')
 
-# ===== CONFIGURATION =====
+# Configuration
 N_TOP_GENES <- 3000
 
 # Loading dictionary of gene symbols
@@ -75,7 +75,6 @@ quantile_normalize_to_reference <- function(reference_data, query_data) {
 }
 
 # Load original 32 cell line dataset
-
 X_orig <- readRDS('./data/RAW.UMI.counts.BC.cell.lines.rds')
 X_orig <- X_orig[rownames(X_orig) %in% ENSEMBL$Gene.stable.ID, , drop = FALSE]
 
@@ -90,7 +89,6 @@ cat(paste("\nOriginal dataset contains", length(orig_cell_lines), "cell lines:\n
 print(sort(orig_cell_lines))
 
 # Load Kinker et al. 2020 dataset
-
 kinker_meta <- fread('./data/SCP542/metadata/Metadata.txt',
                      header = TRUE,
                      sep = '\t')
@@ -162,7 +160,6 @@ cat(paste("\nKinker dataset contains", length(kinker_cell_lines), "cell lines:\n
 print(sort(kinker_cell_lines))
 
 # Identify overlapping cell lines
-
 orig_cl_upper <- toupper(orig_cell_lines)
 kinker_cl_upper <- toupper(kinker_cell_lines)
 
@@ -180,7 +177,6 @@ cat(paste("Overlapping cell lines (will merge):", length(overlapping_lines), "\n
 kinker_breast_all <- kinker_breast
 
 # Find common genes for intersection
-
 common_genes <- intersect(rownames(X_orig), rownames(kinker_breast_all))
 cat(paste("Common genes between datasets:", length(common_genes), "\n"))
 
@@ -191,7 +187,6 @@ cat(paste("Original dataset subset:", nrow(X_orig_common), "genes x", ncol(X_ori
 cat(paste("Kinker dataset subset:", nrow(kinker_common), "genes x", ncol(kinker_common), "cells\n"))
 
 # Filter for highly expressed genes
-
 if(!is.null(N_TOP_GENES)) {
   if(inherits(X_orig_common, "sparseMatrix")) {
     orig_mean <- Matrix::rowMeans(X_orig_common)
@@ -215,12 +210,11 @@ if(!is.null(N_TOP_GENES)) {
   kinker_common <- kinker_common[top_genes, ]
   
   cat(paste("\nAfter expression filtering:\n"))
-  cat(paste("  Original dataset:", nrow(X_orig_common), "genes x", ncol(X_orig_common), "cells\n"))
-  cat(paste("  Kinker dataset:", nrow(kinker_common), "genes x", ncol(kinker_common), "cells\n"))
+  cat(paste("Original dataset:", nrow(X_orig_common), "genes x", ncol(X_orig_common), "cells\n"))
+  cat(paste("Kinker dataset:", nrow(kinker_common), "genes x", ncol(kinker_common), "cells\n"))
 }
 
 # Quantile Normalization
-
 kinker_scaled <- quantile_normalize_to_reference(X_orig_common, kinker_common)
 
 # Check distribution match
@@ -266,11 +260,8 @@ if(length(overlapping_lines) > 0) {
 }
 
 # Create seurat object
-
 X_combined_sparse <- as(X_combined, "sparseMatrix")
-
 X <- CreateSeuratObject(X_combined_sparse, min.cells = 3, min.features = 200)
-
 X$dataset_source <- dataset_source[colnames(X)]
 X$cell_line <- getCellLines(X)
 
@@ -375,7 +366,6 @@ P2 <- ggplot(ACC, aes(steps, Accuracy)) +
 print(P2)
 
 # Create breast cancer atlas
-
 clBRCA <- buildReference(
   exp_ref = GetAssayData(X, assay = "RNA", slot = "counts"),
   metadata_ref = data.frame(cellLine = getCellLines(GetAssayData(X, assay = "RNA", slot = "counts"))),
@@ -420,8 +410,7 @@ print(P1)
 
 # Benchmarking
 
-# ===== TESTING MCF7 =====
-cat("\n===== Testing MCF7 =====\n")
+# MCF7
 MCF7 <- read.csv('./data/MCF7.csv')
 MCF7 <- as.matrix(MCF7)
 
@@ -469,8 +458,7 @@ cat("\nPrediction breakdown:\n")
 pred_table <- table(mcf7Map$meta_data$cell_type_pred_knn)
 print(sort(pred_table[pred_table > 0], decreasing = TRUE))
 
-# ===== TESTING T47D =====
-cat("\n===== Testing T47D =====\n")
+# T47D
 td47dData <- read.csv('./data/GSM4285803_scRNA_RawCounts.csv.gz', row.names = 1)
 td47dData <- t(td47dData)
 td47dMetaData <- read.csv('./data/GSM4285803_scRNA_metaInfo.csv.gz')
@@ -492,7 +480,7 @@ plotData <- rbind(data.frame(clBRCA$umap$embedding, cl='Ref'),
                   data.frame(td47Map$umap, cl='T47D'))
 plotData$ct <- c(clBRCA$meta_data$cellLine, 
                  ifelse(td47_inliers, 'Q', 'O'))
-write.csv(plotData, './results/F2D_kinker.csv')
+write.csv(plotData, './results/F2D.csv')
 
 P4 <- ggplot(plotData, aes(UMAP1, UMAP2)) +
   geom_point(cex = 0.01, color = ifelse(plotData$ct %in% c('Q', 'O'), 'red', 'gray75'), alpha = 1) +
@@ -525,8 +513,7 @@ cat("\nPrediction breakdown:\n")
 pred_table_t47d <- table(td47Map$meta_data$cell_type_pred_knn)
 print(sort(pred_table_t47d[pred_table_t47d > 0], decreasing = TRUE))
 
-# ===== TESTING BT474 =====
-cat("\n===== Testing BT474 =====\n")
+# BT474
 bt474Data <- read.csv('./data/GSE150949_pooled_watermelon.count.matrix.csv.gz', row.names = 1)
 bt474MetaData <- read.csv('./data/GSE150949_pooled_watermelon.metadata.matrix.csv.gz')
 bt474MetaData <- bt474MetaData[grepl('BT474', bt474MetaData$cell_line),]
@@ -589,7 +576,7 @@ pred_table_bt474 <- table(bt474Map$meta_data$cell_type_pred_knn)
 print(sort(pred_table_bt474[pred_table_bt474 > 0], decreasing = TRUE))
 
 # Create Combined Figure
-png('./figures/F2_kinker_integrated.png', width = 3500, height = 1750, res = 300)
+png('./figures/F2.png', width = 3500, height = 1750, res = 300)
 pLayout <- '
 AABC
 AADE'
@@ -628,9 +615,9 @@ clProportion$cellsubtype <- cellSubtype[as.vector(clProportion$cellLine)]
 clProportion$cellsubtype[grepl('TNBC', clProportion$cellsubtype)] <- 'TNBC'
 clProportion$cellsubtype[grepl('Lum', clProportion$cellsubtype)] <- 'ER+'
 clProportion$cellLine <- factor(clProportion$cellLine, levels = clMD$CL)
-write.csv(clProportion, './results/F3C_integrated.csv')
+write.csv(clProportion, './results/F3C.csv')
 
-clProportion <- read.csv('./results/F3C_integrated.csv', row.names = 1)
+clProportion <- read.csv('./results/F3C.csv', row.names = 1)
 O <- round(acast(data = clProportion, formula = donor~cellLine, value.var = 'proportion') * 100,2)
 O <- O[,clMD$CL]
 col_fun = colorRamp2(c(0, 50), c("gray99", "red"))
@@ -717,7 +704,7 @@ P6 <- ggplot(qmap, aes(UMAP1, UMAP2)) +
 P6
 
 source('./S2-LOOCV-Integration.R')
-LOOCV <- read.csv('./results/ccLOOCV_integrated.csv', row.names = 1)
+LOOCV <- read.csv('./results/ccLOOCV.csv', row.names = 1)
 cvMean <- round((apply(LOOCV,1,mean)/ncol(donorData)) * 100,2)
 cvSD <- round((apply(LOOCV,1,sd)/ncol(donorData)) * 100,2)
 RMSE <- sqrt(mean((round(sort(table(qc$cell_type_pred_knn)/nrow(qc)*100, decreasing = TRUE),2)-sort(cvMean, decreasing = TRUE))^2))
