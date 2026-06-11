@@ -128,24 +128,24 @@ rownames(kinker_breast) <- gene_names
 cat("\nCleaning Kinker data...\n")
 na_genes <- rowSums(is.na(kinker_breast)) > 0
 if(sum(na_genes) > 0) {
-  cat(paste("  Removing", sum(na_genes), "genes with NA values\n"))
+  cat(paste("Removing", sum(na_genes), "genes with NA values\n"))
   kinker_breast <- kinker_breast[!na_genes, ]
 }
 
 gene_vars <- apply(kinker_breast, 1, var)
 zero_var_genes <- gene_vars == 0 | is.na(gene_vars)
 if(sum(zero_var_genes) > 0) {
-  cat(paste("  Removing", sum(zero_var_genes), "genes with zero variance\n"))
+  cat(paste("Removing", sum(zero_var_genes), "genes with zero variance\n"))
   kinker_breast <- kinker_breast[!zero_var_genes, ]
 }
 
 all_zero_genes <- rowSums(kinker_breast) == 0
 if(sum(all_zero_genes) > 0) {
-  cat(paste("  Removing", sum(all_zero_genes), "all-zero genes\n"))
+  cat(paste("Removing", sum(all_zero_genes), "all-zero genes\n"))
   kinker_breast <- kinker_breast[!all_zero_genes, ]
 }
 
-cat(paste("  After filtering:", nrow(kinker_breast), "genes x", ncol(kinker_breast), "cells\n"))
+cat(paste("After filtering:", nrow(kinker_breast), "genes x", ncol(kinker_breast), "cells\n"))
 
 # Create proper cell names
 cell_line_for_each_cell <- kinker_breast_meta$Cell_line[match(colnames(kinker_breast), kinker_breast_meta$NAME)]
@@ -239,10 +239,10 @@ names(dataset_source) <- colnames(X_combined)
 cell_lines_combined <- getCellLines(X_combined)
 
 cat("\nCombined dataset summary:\n")
-cat(paste("  Total unique cell lines:", length(unique(cell_lines_combined)), "\n"))
-cat(paste("  From original only:", length(unique_to_original), "\n"))
-cat(paste("  From Kinker only:", length(unique_to_kinker), "\n"))
-cat(paste("  Overlapping (merged from both):", length(overlapping_lines), "\n"))
+cat(paste("Total unique cell lines:", length(unique(cell_lines_combined)), "\n"))
+cat(paste("From original only:", length(unique_to_original), "\n"))
+cat(paste("From Kinker only:", length(unique_to_kinker), "\n"))
+cat(paste("Overlapping (merged from both):", length(overlapping_lines), "\n"))
 
 if(length(overlapping_lines) > 0) {
   cat("\nDetails for overlapping cell lines:\n")
@@ -273,15 +273,7 @@ X <- NormalizeData(X)
 
 cat(paste("Final dataset:", ncol(X), "cells from", length(unique(X$cell_line)), "cell lines\n"))
 
-# Summary
-cat(paste("Dimensions:", nrow(X), "genes x", ncol(X), "cells\n"))
-cat("\nCells by dataset source:\n")
-print(table(X$dataset_source))
-cat("\nCells by cell line:\n")
-print(sort(table(X$cell_line), decreasing = TRUE))
-
 # Save
-cat("\nSaving integrated Seurat object...\n")
 saveRDS(X, paste0('./results/integrated_breast_cancer_atlas', '.rds'))
 
 metadata_df <- data.frame(
@@ -298,33 +290,60 @@ rm(X_orig, kinker_breast, kinker_breast_dt, gene_names, header, all_cell_names,
    kinker_scaled, X_combined, X_combined_sparse, kinker_breast_all)
 gc()
 
-# Show list of breast cancer types
+# Named subtype lookup
+subtypeLookup <- c(
+  # HER2+
+  AU565      = "Her2+", BT474        = "Her2+", EFM192A    = "Her2+",
+  EVSAT      = "Her2+", HCC1419      = "Her2+", HCC1954    = "Her2+",
+  HCC2218    = "Her2+", JIMT1        = "Her2+", MDAMB361   = "Her2+",
+  SKBR3      = "Her2+", UACC812      = "Her2+", UACC893    = "Her2+",
+  "MDA-MB-361" = "Her2+",
 
-clMD <- data.frame(CL = unique(getCellLines(X)), Type = NA)
-clMD$Type <- c('Her2+', 'TNBC-A', 'TNBC-A', 'TNBC-A', 'Lum',
-               'TNBC-A', 'TNBC-A', 'Her2+', 'Lum', 'TNBC-A',
-               'TNBC-B', 'Her2+', 'TNBC-B', 'Lum', 'TNBC-B',
-               'Her2+', 'TNBC-B', 'Lum', 'Lum', 'TNBC-A',
-               'Lum', 'Her2+', 'TNBC-A', 'Her2+', 'TNBC-A',
-               'TNBC-A', 'NI', 'TNBC-A', 'Lum', 'Lum',
-               'TNBC-B', 'Her2+', 'TNBA-B', 'Lum', 'Her2+',
-               'Her2+')
-clMD <- clMD[order(clMD$CL),]
+  # Luminal / ER+
+  BT483      = "Lum",   CAMA1        = "Lum",   EFM19      = "Lum",
+  HCC1428    = "Lum",   HCC1500      = "Lum",   KPL1       = "Lum",
+  MCF7       = "Lum",   MDAMB415     = "Lum",   T47D       = "Lum",
+  ZR751      = "Lum",   "MDA-MB-415" = "Lum",   "ZR-75-1"  = "Lum",
+  "ZR-75-30" = "Lum",
+
+  # TNBC-A (Mesenchymal / Claudin-low / LAR)
+  BT20       = "TNBC-A", BT549       = "TNBC-A", CAL51      = "TNBC-A",
+  DU4475     = "TNBC-A", HS578T      = "TNBC-A", MDAMB436   = "TNBC-A",
+  MDAMB453   = "TNBC-A", "MDA-MB-436" = "TNBC-A", "MDA-MB-453" = "TNBC-A",
+
+  # TNBC-B (Basal-like 1)
+  CAL851     = "TNBC-B", HCC1143     = "TNBC-B", HCC1187    = "TNBC-B",
+  HCC1395    = "TNBC-B", HCC1569     = "TNBC-B", HCC1937    = "TNBC-B",
+  HCC38      = "TNBC-B", HCC70       = "TNBC-B", HDQP1      = "TNBC-B",
+  MDAMB468   = "TNBC-B", "MDA-MB-468" = "TNBC-B",
+
+  # Non-informative (non-malignant or ambiguous)
+  MCF12A     = "NI",    MX1          = "NI",    HMC18      = "NI"
+)
+
+all_cl         <- unique(getCellLines(X))
+assigned_types <- subtypeLookup[all_cl]
+missing_cl     <- all_cl[is.na(assigned_types)]
+if (length(missing_cl) > 0) {
+  cat("WARNING: No subtype assigned for:", paste(missing_cl, collapse = ", "), "\n")
+  cat("Add them to subtypeLookup above.\n")
+  assigned_types[is.na(assigned_types)] <- "NI"
+}
+clMD <- data.frame(CL = all_cl, Type = assigned_types, stringsAsFactors = FALSE)
+clMD <- clMD[order(clMD$CL), ]
 cellSubtype <- clMD$Type
 names(cellSubtype) <- clMD$CL
 clColor <- ggColors(nrow(clMD))
 names(clColor) <- clMD$CL
 
 # Cross Validation
-
 steps <- seq(from = (ncol(X)-1000), to = 1000, by = -1000)
 CM <- pbsapply(steps, function(nCells){
   set.seed(0)
   testData <- sample(seq_len(ncol(X)), nCells)
   trainData <- seq_len(ncol(X))[!seq_len(ncol(X)) %in% testData]
   
-  # Use GetAssayData() to access the counts
-  counts_matrix <- GetAssayData(X, assay = "RNA", slot = "counts")
+  counts_matrix <- as(GetAssayData(X, assay = "RNA", layer = "counts"), "CsparseMatrix")
   
   print(paste("Dimension of counts_matrix:", paste(dim(counts_matrix), collapse="x")))
   print(paste("Number of unique cell lines:", length(unique(getCellLines(counts_matrix[,trainData])))))
@@ -365,14 +384,30 @@ P2 <- ggplot(ACC, aes(steps, Accuracy)) +
   theme_bw()
 print(P2)
 
-# Create breast cancer atlas
+# Create breast cancer atlas (HCC1428 and MCF12A excluded)
+
+counts_ref <- as(GetAssayData(X, assay = "RNA", layer = "counts"), "CsparseMatrix")
+counts_ref <- counts_ref[, !getCellLines(counts_ref) %in% c("HCC1428", "MCF12A")]
+
+set.seed(42)
+N_CAP <- 500
+balanced_cells <- unlist(lapply(unique(getCellLines(counts_ref)), function(cl) {
+  idx <- which(getCellLines(counts_ref) == cl)
+  if (length(idx) > N_CAP) idx <- sample(idx, N_CAP)
+  idx
+}))
+counts_ref <- counts_ref[, balanced_cells]
+cat(paste("Balanced reference:", ncol(counts_ref), "cells across",
+          length(unique(getCellLines(counts_ref))), "lines\n"))
+
+
 clBRCA <- buildReference(
-  exp_ref = GetAssayData(X, assay = "RNA", slot = "counts"),
-  metadata_ref = data.frame(cellLine = getCellLines(GetAssayData(X, assay = "RNA", slot = "counts"))),
-  do_umap = TRUE,
-  verbose = TRUE,
-  d = 50, 
-  save_uwot_path = 'umapBRCA'
+  exp_ref        = counts_ref,
+  metadata_ref   = data.frame(cellLine = getCellLines(counts_ref)),
+  do_umap        = TRUE,
+  verbose        = TRUE,
+  d              = 50,
+  save_uwot_path = normalizePath('./results/umapBRCA_model', mustWork = FALSE)
 )
 
 umapBRCA <- data.frame(clBRCA$umap$embedding, cl=clBRCA$meta_data$cellLine)
@@ -392,7 +427,7 @@ labelPos$UMAP2 <- as.numeric(labelPos$UMAP2)
 labelPos$cl <- factor(labelPos$CL, levels = clMD$CL)
 umapBRCA <- umapBRCA[order(umapBRCA$cl, decreasing = TRUE),]
 umapBRCA$cl <- factor(umapBRCA$cl, levels = clMD$CL)
-write.csv('umapBRCA', './results/F2A.csv')
+write.csv(umapBRCA, './results/F2A.csv')
 
 P1 <- ggplot(umapBRCA, aes(UMAP1, UMAP2, color = cl)) +
   geom_point(cex = 0.01) +
@@ -409,7 +444,6 @@ P1 <- ggplot(umapBRCA, aes(UMAP1, UMAP2, color = cl)) +
 print(P1)
 
 # Benchmarking
-
 # MCF7
 MCF7 <- read.csv('./data/MCF7.csv')
 MCF7 <- as.matrix(MCF7)
@@ -432,14 +466,6 @@ P3 <- ggplot(plotData, aes(UMAP1, UMAP2)) +
              alpha = 1) +
   theme_bw() +
   theme(legend.position = 'None') +
-  geom_mark_ellipse(aes(filter = ct == 'Q', color = 'red'),expand = unit(2,'mm')) +
-  annotate(x = median(mcf7Map$umap[,1]) - 3, 
-           y = max(mcf7Map$umap[,2]) - 6,
-           geom = 'text', 
-           label = paste0(round(mcf7CM$overall[1]*100,1), '% MCF7'),
-           color = 'red', 
-           fontface = 'bold', 
-           size = 3) +
   xlab('UMAP 1') +
   ylab('UMAP 2')
 P3 <- P3 + labs(title = 'Wild-Type MCF7', 
@@ -486,14 +512,6 @@ P4 <- ggplot(plotData, aes(UMAP1, UMAP2)) +
   geom_point(cex = 0.01, color = ifelse(plotData$ct %in% c('Q', 'O'), 'red', 'gray75'), alpha = 1) +
   theme_bw() +
   theme(legend.position = 'None') +
-  geom_mark_ellipse(aes(filter = ct == 'Q', color = 'red'), expand = unit(0.5,'mm')) +
-  annotate(x = median(td47Map$umap[td47_inliers,1]), 
-           y = max(td47Map$umap[td47_inliers,2]) + 2,  # Just above the main cluster
-           geom = 'text', 
-           label = paste0(round(td47CM$overall[1]*100, 1), '% T47D'),
-           color = 'red', 
-           fontface = 'bold',
-           size = 3.5) +
   xlab('UMAP 1') +
   ylab('UMAP 2')
 
@@ -548,15 +566,6 @@ P5 <- ggplot(plotData, aes(UMAP1, UMAP2)) +
              alpha = 1) +
   theme_bw() +
   theme(legend.position = 'None') +
-  geom_mark_ellipse(aes(filter = ct == 'Q', color = 'red'), 
-                    expand = unit(0.5,'mm')) +
-  annotate(x = median(bt474Map$umap[bt474_inliers,1] - 5), 
-           y = max(bt474Map$umap[bt474_inliers,2]) - 3,
-           geom = 'text', 
-           label = paste0(round(bt474CM$overall[1]*100,1), '% BT474'),
-           color = 'red', 
-           fontface = 'bold',
-           size = 3) +
   xlab('UMAP 1') +
   ylab('UMAP 2')
 P5 <- P5 + labs(title = 'BT474 + Lapatinib', 
@@ -619,12 +628,14 @@ write.csv(clProportion, './results/F3C.csv')
 
 clProportion <- read.csv('./results/F3C.csv', row.names = 1)
 O <- round(acast(data = clProportion, formula = donor~cellLine, value.var = 'proportion') * 100,2)
-O <- O[,clMD$CL]
+present_cl   <- intersect(clMD$CL, colnames(O))
+O            <- O[, present_cl, drop = FALSE]
+present_type <- clMD$Type[match(present_cl, clMD$CL)]
 col_fun = colorRamp2(c(0, 50), c("gray99", "red"))
 
 png('./figures/S1.png', width = 4000, height = 2500, res = 300)
 Heatmap(O, col = col_fun,
-        column_split = clMD$Type,name = '%',
+        column_split = present_type, name = '%',
         row_split = donorSubType[rownames(O)],
         cell_fun = function(j, i, x, y, width, height, fill) {grid.text(sprintf("%.1f", O[i, j]), x, y, gp = gpar(fontsize = 10))})
 dev.off()
